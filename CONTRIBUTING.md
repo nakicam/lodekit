@@ -33,13 +33,15 @@ lodekit is a monorepo managed as a [uv](https://docs.astral.sh/uv/) workspace.
 4. Run the checks locally:
 
    ```bash
+   uv run pre-commit run --all-files        # everything below plus fixers
    uv run ruff check .
    uv run ruff format --check .
-   uv run mypy
-   uv run pytest
+   uv run python scripts/dev.py typecheck   # mypy --strict, per package
+   uv run python scripts/dev.py test        # pytest, per package, with coverage
    ```
 
-Work on a single package with `uv run --package lodekit-<name> ...`.
+Both helpers accept member names, e.g. `scripts/dev.py test lodekit-common`. See
+[Toolchain and tests](docs/development/toolchain.md) for markers and test levels.
 
 ## Repository layout
 
