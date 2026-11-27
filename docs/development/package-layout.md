@@ -33,6 +33,11 @@ packages/lodekit-<name>/
 package `lodekit`. Otherwise the namespace stops merging and other `lodekit-*` packages become
 unimportable.
 
+CI enforces this with `scripts/check_namespace.py` (namespace guard). Every publishable package
+must set a dotted `module-name = "lodekit.<pkg>"`; `module-name = "lodekit"` and
+`namespace = true` are forbidden, and no built wheel may contain a top-level
+`lodekit/__init__.py`. Run it locally with `uv run python scripts/check_namespace.py`.
+
 ## `pyproject.toml` template
 
 ```toml

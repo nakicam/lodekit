@@ -115,3 +115,16 @@ relative_files = true
 show_missing = true
 skip_covered = false
 exclude_also = ["if TYPE_CHECKING:", "@overload", "raise NotImplementedError"]
+
+[tool.lodekit.license-check]
+# ADR-000: core (runtime) dependencies must be MIT, BSD, Apache-2.0, ISC or PSF licensed.
+allow = [
+    "MIT", "MIT-0",
+    "BSD-2-Clause", "BSD-3-Clause", "0BSD",
+    "Apache-2.0",
+    "ISC",
+    "PSF-2.0", "Python-2.0",
+]
+# Distributions whose metadata cannot be classified automatically but were reviewed manually.
+# Format: <distribution> = "<licence> - <reason / evidence>"
+[tool.lodekit.license-check.exceptions]

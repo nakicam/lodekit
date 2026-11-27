@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import sys
 from pathlib import Path
@@ -101,6 +102,31 @@ def test_select_rejects_unknown_members(workspace: Path) -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("changed", "expected"),
+    [
+        ([], []),
+        (["docs/index.md", "README.md"], []),
+        (["packages/lodekit-flow/src/lodekit/flow/x.py"], ["example-hello", "lodekit-flow"]),
+        (
+            ["packages/lodekit-common/README.md"],
+            ["example-hello", "lodekit-common", "lodekit-flow"],
+        ),
+        (["examples/hello/main.py"], ["example-hello"]),
+        (["uv.lock"], ["example-hello", "lodekit-common", "lodekit-flow"]),
+        ([".github/workflows/ci.yml"], ["example-hello", "lodekit-common", "lodekit-flow"]),
+        (["packages\\lodekit-flow\\README.md"], ["example-hello", "lodekit-flow"]),
+    ],
+)
+def test_affected_includes_transitive_dependents(
+    workspace: Path, changed: list[str], expected: list[str]
+) -> None:
+    members = dev.discover(workspace)
+
+    assert [m.name for m in dev.affected(members, changed)] == expected
+
+
+@pytest.mark.unit
 def test_check_license_files_reports_missing_and_stale_copies(workspace: Path) -> None:
     assert dev.check_license_files(workspace) == []
 
@@ -122,3 +148,21 @@ def test_repository_license_copies_are_in_sync() -> None:
 def test_namespace_root_has_no_init_file() -> None:
     offenders = sorted(p.as_posix() for p in ROOT.glob("packages/*/src/lodekit/__init__.py"))
     assert offenders == [], "lodekit/ must stay a PEP 420 namespace without __init__.py"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("raw", "expected"), [("[]", []), ('["b"]', ["b"]), (None, ["a", "b"])])
+def test_members_json_selects_exactly(raw: str | None, expected: list[str]) -> None:
+    members = [
+        dev.Member(
+            name=n,
+            path=f"packages/{n}",
+            kind="packages",
+            module=None,
+            publishable=True,
+            workspace_deps=[],
+        )
+        for n in ("a", "b")
+    ]
+    args = argparse.Namespace(members=[], members_json=raw)
+    assert [m.name for m in dev._chosen_members(members, args)] == expected
