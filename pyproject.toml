@@ -116,6 +116,8 @@ branch = true
 relative_files = true
 
 [tool.coverage.report]
+# Applies to the per-package runs of `scripts/dev.py test` (`--cov=<module>`).
+fail_under = 90
 show_missing = true
 skip_covered = false
 exclude_also = ["if TYPE_CHECKING:", "@overload", "raise NotImplementedError"]

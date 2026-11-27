@@ -1,0 +1,36 @@
+[project]
+name = "lodekit-common"
+version = "0.1.0"
+description = "Shared foundations for lodekit packages: run context and common types."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "lodekit contributors" }]
+keywords = ["lodekit", "data", "agents", "observability"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = ["pydantic>=2.7,<3"]
+
+[project.urls]
+Homepage = "https://github.com/nakicam/lodekit"
+Documentation = "https://github.com/nakicam/lodekit/tree/main/docs"
+Source = "https://github.com/nakicam/lodekit/tree/main/packages/lodekit-common"
+Issues = "https://github.com/nakicam/lodekit/issues"
+Changelog = "https://github.com/nakicam/lodekit/blob/main/packages/lodekit-common/CHANGELOG.md"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "lodekit.common"
