@@ -1,0 +1,80 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.13.10"
+
+jobs:
+  release-please:
+    name: Release PRs and tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: config
+        name: Skip while no package is configured
+        run: echo "count=$(jq '.packages | length' release-please-config.json)" >> "$GITHUB_OUTPUT"
+
+      - id: rp
+        if: steps.config.outputs.count != '0'
+        uses: googleapis/release-please-action@v5
+        with:
+          # A GitHub App or fine-grained token lets release PRs trigger CI; see docs/development/releasing.md.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - uses: astral-sh/setup-uv@v10
+        if: steps.rp.outputs.prs_created == 'true'
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Refresh uv.lock on each release PR (release-please does not update it)
+        if: steps.rp.outputs.prs_created == 'true'
+        env:
+          PRS: ${{ steps.rp.outputs.prs }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          for branch in $(echo "$PRS" | jq -r '.[].headBranchName'); do
+            git fetch --depth 1 origin "$branch"
+            git checkout -B "$branch" FETCH_HEAD
+            uv lock
+            if git diff --quiet -- uv.lock; then
+              echo "uv.lock already up to date on $branch"
+            else
+              git commit -s -m "chore: update uv.lock for release" -- uv.lock
+              git push origin "HEAD:$branch"
+            fi
+          done
+
+      - name: Dispatch the release workflow for each created tag
+        if: steps.rp.outputs.releases_created == 'true'
+        env:
+          OUTPUTS: ${{ toJSON(steps.rp.outputs) }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          for path in $(echo "$OUTPUTS" | jq -r '.paths_released | fromjson | .[]'); do
+            tag=$(echo "$OUTPUTS" | jq -r --arg key "${path}--tag_name" '.[$key]')
+            echo "Dispatching release.yml for $tag"
+            gh workflow run release.yml --repo "$REPO" --ref main -f tag="$tag" -f dry-run=false
+          done

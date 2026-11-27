@@ -44,7 +44,11 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 not_in_nav: |
   /decisions/template.md
@@ -62,6 +66,7 @@ nav:
       - Package layout: development/package-layout.md
       - Toolchain: development/toolchain.md
       - Continuous integration: development/ci.md
+      - Releasing: development/releasing.md
       - Documentation: development/docs.md
   - Spikes:
       - Namespace packages and mypy: spikes/0001-namespace-packages-mypy.md
