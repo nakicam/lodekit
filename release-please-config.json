@@ -8,5 +8,11 @@
   "bump-minor-pre-major": true,
   "changelog-path": "CHANGELOG.md",
   "pull-request-title-pattern": "chore${scope}: release${component} ${version}",
-  "packages": {}
+  "packages": {
+    "packages/lodekit-common": {
+      "package-name": "lodekit-common",
+      "component": "lodekit-common",
+      "release-as": "0.1.0"
+    }
+  }
 }

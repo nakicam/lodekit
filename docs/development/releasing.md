@@ -57,17 +57,26 @@ PyPI (production) publishing is added after gate G3, with its own `pypi` environ
 
 ## Adding a package to the release flow
 
-Add the package path to `release-please-config.json` and its current version to
-`.release-please-manifest.json`:
+Add the package path to `release-please-config.json` and its **last released** version to
+`.release-please-manifest.json`. For a package that was never released, use `0.0.0` and pin the
+first version with `release-as`:
 
 ```json
 // release-please-config.json
 "packages": {
-  "packages/lodekit-common": {"package-name": "lodekit-common", "component": "lodekit-common"}
+  "packages/lodekit-common": {
+    "package-name": "lodekit-common",
+    "component": "lodekit-common",
+    "release-as": "0.1.0"
+  }
 }
 // .release-please-manifest.json
-{"packages/lodekit-common": "0.1.0"}
+{"packages/lodekit-common": "0.0.0"}
 ```
+
+After the first release PR is merged and tagged, remove `release-as` in a follow-up commit so
+later versions are derived from Conventional Commits again. The package's `pyproject.toml`
+version must match the `release-as` value; `release.yml` refuses tags that do not match it.
 
 While `packages` is empty, the workflow skips release-please.
 
