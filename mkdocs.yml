@@ -69,5 +69,7 @@ nav:
       - Releasing: development/releasing.md
       - Security baseline: development/security.md
       - Documentation: development/docs.md
+  - Examples:
+      - Synthetic retail dataset (EX-1): examples/synthetic-retail-dataset.md
   - Spikes:
       - Namespace packages and mypy: spikes/0001-namespace-packages-mypy.md
