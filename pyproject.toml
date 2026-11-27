@@ -8,7 +8,15 @@ license = "Apache-2.0"
 classifiers = ["Private :: Do Not Upload"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "mypy>=2.4.1",
+    "pre-commit>=4.7.0",
+    "pydantic>=2.14.4",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.6",
+]
 
 [tool.uv]
 # The root is a virtual workspace root: it is never built or published.
@@ -17,3 +25,93 @@ default-groups = ["dev"]
 
 [tool.uv.workspace]
 members = ["packages/*", "examples/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["packages/*/src", "packages/*/tests", "examples/*", "scripts", "tests"]
+extend-exclude = [".m0-sources"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "C4",       # comprehensions
+    "PT",       # pytest style
+    "RUF",      # ruff-specific
+    "S",        # bandit (security)
+    "N",        # pep8-naming
+    "TID",      # tidy imports
+    "PL",       # pylint subset
+    "D",        # pydocstyle
+]
+ignore = [
+    "D100", "D104", "D105", "D107",  # module/package/magic/__init__ docstrings
+    "PLR0913",                       # too many arguments (pydantic models, factories)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "D", "PLR2004"]
+"scripts/**" = ["S603", "S607", "T201"]
+"examples/**" = ["T201", "D"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+python_version = "3.11"
+# PEP 420 namespace packages: map files below "src" to their dotted module names.
+# mypy runs per package from the package directory (scripts/dev.py typecheck), see
+# docs/spikes/0001-namespace-packages-mypy.md.
+explicit_package_bases = true
+mypy_path = "src"
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "-m", "not live",
+]
+testpaths = ["packages", "examples", "tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+xfail_strict = true
+filterwarnings = ["error"]
+markers = [
+    "unit: fast, isolated logic tests; no network, no real LLMs",
+    "contract: public API and JSON schema snapshots; fail on unintended API changes",
+    "integration: real local engines (e.g. DuckDB with temporary files); run in PR CI",
+    "e2e: cross-package end-to-end flows with fake models",
+    "live: real external services or LLM providers; never run in PR CI",
+]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = ["if TYPE_CHECKING:", "@overload", "raise NotImplementedError"]

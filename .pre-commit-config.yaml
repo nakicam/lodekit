@@ -1,0 +1,62 @@
+# Install: uv run pre-commit install --hook-type pre-commit --hook-type commit-msg
+# ruff and mypy run from the locked dev environment (uv run) so hook and CI versions match.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+exclude: ^\.m0-sources/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.13.10
+    hooks:
+      - id: uv-lock
+        args: [--check]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.5.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--strict, feat, fix, docs, refactor, perf, test, build, ci, chore, revert]
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: mypy
+        name: mypy --strict (per package)
+        entry: uv run --frozen python scripts/dev.py typecheck
+        language: system
+        types_or: [python, pyi, toml]
+        pass_filenames: false
+        require_serial: true
+      - id: license-files
+        name: package LICENSE/NOTICE copies in sync
+        entry: uv run --frozen python scripts/dev.py check-license-files
+        language: system
+        files: (^|/)(LICENSE|NOTICE|pyproject\.toml)$
+        pass_filenames: false
