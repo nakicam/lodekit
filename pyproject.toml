@@ -17,6 +17,10 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.6",
 ]
+docs = [
+    "mkdocs-material>=9.8.2",
+    "mkdocstrings[python]>=1.0.8",
+]
 
 [tool.uv]
 # The root is a virtual workspace root: it is never built or published.

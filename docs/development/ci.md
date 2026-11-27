@@ -1,6 +1,6 @@
 # Continuous integration
 
-All checks live in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). It runs on pull
+All checks live in [`.github/workflows/ci.yml`](https://github.com/nakicam/lodekit/blob/main/.github/workflows/ci.yml). It runs on pull
 requests, pushes to `main`, merge-queue groups, and on demand (`workflow_dispatch`). Workflow
 permissions default to `contents: read`.
 
@@ -38,6 +38,7 @@ uv run python scripts/dev.py test --members-json '["lodekit-common"]'
 | `lowest-direct` | `uv sync --resolution lowest-direct` on Python 3.11 plus the tests; this keeps declared lower bounds honest. |
 | `licenses` | Installs only runtime dependencies (`--no-dev`) and runs `scripts/check_licenses.py` against the [ADR-000](../decisions/0000-license-apache-2.0.md) allow-list (`[tool.lodekit.license-check]` in the root `pyproject.toml`). The report goes to the job summary. |
 | `dependency-tree` | `uv tree --no-dev` and the number of third-party runtime distributions go to the job summary and an artifact. Watched transitive dependencies (`langsmith`, `langgraph-sdk`) are flagged. |
+| `docs` | `mkdocs build --strict` for the documentation site (see [documentation](docs.md)). |
 | `secrets` | gitleaks over the full history. |
 | `ci-success` | Aggregator. Fails if any job above failed or was cancelled; skipped jobs (no affected package) count as success. |
 
@@ -81,5 +82,5 @@ with `protection.json`:
 }
 ```
 
-The `examples-smoke` job ([examples conventions](../../examples/README.md)) becomes a second
+The `examples-smoke` job ([examples conventions](https://github.com/nakicam/lodekit/blob/main/examples/README.md)) becomes a second
 required check once the first example exists.
