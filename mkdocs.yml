@@ -67,6 +67,7 @@ nav:
       - Toolchain: development/toolchain.md
       - Continuous integration: development/ci.md
       - Releasing: development/releasing.md
+      - Security baseline: development/security.md
       - Documentation: development/docs.md
   - Spikes:
       - Namespace packages and mypy: spikes/0001-namespace-packages-mypy.md

@@ -58,29 +58,11 @@ Branch protection on `main` should require **only** the `CI success` check. Requ
 matrix jobs breaks whenever the matrix changes, or when a job is skipped because no package is
 affected. Settings → Branches → `main`:
 
-1. Require a pull request before merging (1 approval, dismiss stale approvals).
+1. Require a pull request before merging.
 2. Require status checks to pass: `CI success`; require branches to be up to date.
 3. Require signed-off commits (DCO) and linear history; block force pushes and deletions.
 
-Equivalent API call (admin only):
-
-```console
-gh api -X PUT repos/nakicam/lodekit/branches/main/protection --input protection.json
-```
-
-with `protection.json`:
-
-```json
-{
-  "required_status_checks": {"strict": true, "contexts": ["CI success"]},
-  "enforce_admins": false,
-  "required_pull_request_reviews": {"required_approving_review_count": 1, "dismiss_stale_reviews": true},
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false
-}
-```
+The exact settings and the `gh api` call are in [security baseline](security.md#branch-protection-for-main).
 
 The `examples-smoke` job ([examples conventions](https://github.com/nakicam/lodekit/blob/main/examples/README.md)) becomes a second
 required check once the first example exists.
