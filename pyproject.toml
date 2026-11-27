@@ -1,0 +1,19 @@
+[project]
+name = "lodekit-workspace"
+version = "0.0.0"
+description = "Development workspace root for the lodekit monorepo (not published)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+classifiers = ["Private :: Do Not Upload"]
+
+[dependency-groups]
+dev = []
+
+[tool.uv]
+# The root is a virtual workspace root: it is never built or published.
+package = false
+default-groups = ["dev"]
+
+[tool.uv.workspace]
+members = ["packages/*", "examples/*"]
