@@ -1,0 +1,5 @@
+# Default owner for everything in the repository.
+* @nakicam
+
+# Package-specific owners can be added below once packages exist, e.g.
+# /packages/lodekit-agents/ @nakicam
