@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a new capability or an improvement.
+title: "feat(<scope>): <short summary>"
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - lodekit-common
+        - lodekit-flow
+        - lodekit-quality
+        - lodekit-agents
+        - examples
+        - docs / repository
+        - new package
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Which problem does this solve? Who needs it?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Verifiable criteria, one per line.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on
+      placeholder: "#<issue> or none"
+  - type: markdown
+    attributes:
+      value: |
+        New core dependencies must be MIT, BSD, Apache-2.0, ISC or PSF licensed (ADR-000).

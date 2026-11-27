@@ -1,0 +1,65 @@
+name: User check ("Fresh Eyes")
+description: Record a user check of a package, example or release candidate.
+title: "user-check: <package or example> <version>"
+labels: ["user-check"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A person without repository knowledge installs from the release artefact into an empty venv,
+        on Windows and Linux, and follows only the README. Stop the time and work through the checklist.
+        A **Fail** blocks the gate. Open an issue for every point of a "Pass with issues".
+  - type: input
+    id: subject
+    attributes:
+      label: Subject under test
+      placeholder: "e.g. lodekit-common 0.1.0 from TestPyPI, examples/hello-agent"
+    validations:
+      required: true
+  - type: input
+    id: gate
+    attributes:
+      label: Gate
+      placeholder: "e.g. G2"
+  - type: input
+    id: environments
+    attributes:
+      label: Environments
+      placeholder: "e.g. Windows 11 / PowerShell / Python 3.12; Ubuntu 24.04 / bash / Python 3.13"
+    validations:
+      required: true
+  - type: input
+    id: duration
+    attributes:
+      label: Time from empty venv to result
+      placeholder: "e.g. 4 min"
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Installs from the release artefact into an empty venv
+        - label: Runs offline with one command
+        - label: Core statement / expected answer is correct
+        - label: Error messages are understandable
+        - label: Licence and data licence notes are present
+        - label: No DuckDB logo; only text attribution "built on DuckDB" plus trademark notice
+        - label: No secrets required or exposed
+        - label: Copy-paste works in PowerShell and bash
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Pass
+        - Pass with issues
+        - Fail
+    validations:
+      required: true
+  - type: textarea
+    id: findings
+    attributes:
+      label: Findings
+      description: Observations, linked follow-up issues for "Pass with issues".

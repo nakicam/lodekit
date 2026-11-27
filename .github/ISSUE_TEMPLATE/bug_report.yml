@@ -1,0 +1,58 @@
+name: Bug report
+description: Something does not work as documented.
+title: "fix(<scope>): <short summary>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please do **not** report security vulnerabilities here; see SECURITY.md.
+        Never paste secrets, credentials or proprietary data.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - lodekit-common
+        - lodekit-flow
+        - lodekit-quality
+        - lodekit-agents
+        - examples
+        - docs / repository
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: "e.g. 0.1.0 or commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "OS, Python version, uv/pip version"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the full error message or traceback.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Smallest code or commands that reproduce the problem.
+      render: python
+    validations:
+      required: true
