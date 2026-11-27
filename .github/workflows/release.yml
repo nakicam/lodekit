@@ -1,0 +1,107 @@
+name: release
+
+# Builds one package from a release tag and publishes it to TestPyPI via Trusted Publishing.
+# Dispatched by release-please.yml after a release PR is merged, or manually (dry run by default).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. lodekit-common-v0.1.0"
+        required: true
+        type: string
+      dry-run:
+        description: "Build and verify only; do not publish"
+        required: true
+        default: true
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.13.10"
+
+jobs:
+  build:
+    name: Build ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      package: ${{ steps.resolve.outputs.package }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+      - id: resolve
+        name: Resolve package and version from the tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$TAG" =~ ^(lodekit(-[a-z0-9]+)*)-v([0-9]+\.[0-9]+\.[0-9]+.*)$ ]] \
+            || { echo "::error::tag '$TAG' does not match <pkg>-v<semver>"; exit 1; }
+          package="${BASH_REMATCH[1]}"; version="${BASH_REMATCH[3]}"
+          declared=$(uv run --no-project python - "$package" <<'EOF'
+          import sys, tomllib, pathlib
+          meta = tomllib.loads(pathlib.Path(f"packages/{sys.argv[1]}/pyproject.toml").read_text())
+          print(meta["project"]["version"])
+          EOF
+          )
+          [ "$declared" = "$version" ] \
+            || { echo "::error::tag version $version != pyproject version $declared"; exit 1; }
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build sdist and wheel
+        run: uv build --package "${{ steps.resolve.outputs.package }}" --out-dir dist --no-sources
+      - name: Namespace guard (no lodekit/__init__.py in the wheel)
+        run: python3 scripts/check_namespace.py --wheels dist
+      - name: Verify metadata and a clean install
+        env:
+          PACKAGE: ${{ steps.resolve.outputs.package }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          ls -l dist
+          uvx twine check --strict dist/*
+          uv venv "$RUNNER_TEMP/verify" --python 3.12
+          uv pip install --python "$RUNNER_TEMP/verify" dist/*.whl
+          "$RUNNER_TEMP/verify/bin/python" -c "import importlib.metadata as m, sys; v = m.version('$PACKAGE'); print('$PACKAGE', v); sys.exit(v != '$VERSION')"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: ${{ !inputs.dry-run }}
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/${{ needs.build.outputs.package }}/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: GitHub build provenance attestation
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*
+      - name: Publish via Trusted Publishing (PEP 740 attestations enabled)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          attestations: true

@@ -35,6 +35,7 @@ uv run python scripts/dev.py test --members-json '["lodekit-common"]'
 | `ty` | Astral `ty`, **informational only** (`continue-on-error`). |
 | `test` | pytest (`-m "not live"`) on Ubuntu × Python 3.11–3.14, plus Windows and macOS on 3.12. |
 | `isolation` | For each affected publishable package, builds the wheel and installs it into a clean venv with no workspace and no editable installs. It also adds wheels of sibling packages as `--find-links`, so only *declared* dependencies resolve. It asserts that `lodekit` is a namespace package and that the module is imported from `site-packages`, then runs the package's unit and contract tests against the installed wheel. |
+| `examples-smoke` | Ubuntu and Windows, Python 3.12. For each affected example, it builds the wheels the example depends on, installs them plus the declared third-party dependencies into a fresh venv, and runs the example offline from a copy outside the repository (`scripts/examples_smoke.py`). It passes trivially while there are no examples; because it is part of `CI success`, it becomes required as soon as the first example exists. See [Examples](https://github.com/nakicam/lodekit/blob/main/examples/README.md). |
 | `lowest-direct` | `uv sync --resolution lowest-direct` on Python 3.11 plus the tests; this keeps declared lower bounds honest. |
 | `licenses` | Installs only runtime dependencies (`--no-dev`) and runs `scripts/check_licenses.py` against the [ADR-000](../decisions/0000-license-apache-2.0.md) allow-list (`[tool.lodekit.license-check]` in the root `pyproject.toml`). The report goes to the job summary. |
 | `dependency-tree` | `uv tree --no-dev` and the number of third-party runtime distributions go to the job summary and an artifact. Watched transitive dependencies (`langsmith`, `langgraph-sdk`) are flagged. |
@@ -58,29 +59,11 @@ Branch protection on `main` should require **only** the `CI success` check. Requ
 matrix jobs breaks whenever the matrix changes, or when a job is skipped because no package is
 affected. Settings → Branches → `main`:
 
-1. Require a pull request before merging (1 approval, dismiss stale approvals).
+1. Require a pull request before merging.
 2. Require status checks to pass: `CI success`; require branches to be up to date.
 3. Require signed-off commits (DCO) and linear history; block force pushes and deletions.
 
-Equivalent API call (admin only):
-
-```console
-gh api -X PUT repos/nakicam/lodekit/branches/main/protection --input protection.json
-```
-
-with `protection.json`:
-
-```json
-{
-  "required_status_checks": {"strict": true, "contexts": ["CI success"]},
-  "enforce_admins": false,
-  "required_pull_request_reviews": {"required_approving_review_count": 1, "dismiss_stale_reviews": true},
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false
-}
-```
+The exact settings and the `gh api` call are in [security baseline](security.md#branch-protection-for-main).
 
 The `examples-smoke` job ([examples conventions](https://github.com/nakicam/lodekit/blob/main/examples/README.md)) becomes a second
 required check once the first example exists.

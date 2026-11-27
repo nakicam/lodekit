@@ -181,6 +181,27 @@ jobs:
               --rootdir "$GITHUB_WORKSPACE" -m "unit or contract" -p no:cacheprovider
           fi
 
+  examples-smoke:
+    name: Examples smoke (${{ matrix.os }})
+    needs: changes
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          python-version: "3.12"
+      - name: Run affected examples from built wheels in clean venvs (offline)
+        shell: bash
+        env:
+          MEMBERS: ${{ needs.changes.outputs.members }}
+        run: uv run --no-project python scripts/examples_smoke.py --python 3.12 --members-json "$MEMBERS"
+
   lowest-direct:
     name: Lowest direct dependencies (py3.11)
     needs: changes
@@ -275,7 +296,7 @@ jobs:
   ci-success:
     name: CI success
     if: always()
-    needs: [changes, lint, typecheck, test, isolation, lowest-direct, licenses, dependency-tree, docs, secrets]
+    needs: [changes, lint, typecheck, test, isolation, examples-smoke, lowest-direct, licenses, dependency-tree, docs, secrets]
     runs-on: ubuntu-latest
     steps:
       - name: All required jobs passed or were skipped by path filters
