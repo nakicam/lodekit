@@ -1,0 +1,67 @@
+site_name: lodekit
+site_description: Composable, independently installable Python packages for data and AI workflows, built on DuckDB.
+site_url: https://nakicam.github.io/lodekit/
+repo_url: https://github.com/nakicam/lodekit
+repo_name: nakicam/lodekit
+edit_uri: edit/main/docs/
+copyright: Copyright 2026 Naki Cam and the lodekit contributors. Apache-2.0.
+strict: true
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [packages/*/src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+
+not_in_nav: |
+  /decisions/template.md
+
+nav:
+  - Home: index.md
+  - Roadmap: roadmap.md
+  - Architecture decisions:
+      - Overview: decisions/index.md
+      - ADR-000 Licence (Apache-2.0): decisions/0000-license-apache-2.0.md
+      - ADR-001 Monorepo tooling: decisions/0001-monorepo-uv-workspace.md
+      - ADR-002 Agent runtime: decisions/0002-agent-runtime-langgraph.md
+      - ADR-003 Data storage: decisions/0003-data-storage-duckdb-ducklake.md
+  - Development:
+      - Package layout: development/package-layout.md
+      - Toolchain: development/toolchain.md
+      - Continuous integration: development/ci.md
+      - Documentation: development/docs.md
+  - Spikes:
+      - Namespace packages and mypy: spikes/0001-namespace-packages-mypy.md

@@ -247,6 +247,20 @@ jobs:
             dependency-tree.txt
             runtime-requirements.txt
 
+  docs:
+    name: Docs (mkdocs build --strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --group docs --locked
+      - run: uv run --no-sync mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+
   secrets:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
@@ -261,7 +275,7 @@ jobs:
   ci-success:
     name: CI success
     if: always()
-    needs: [changes, lint, typecheck, test, isolation, lowest-direct, licenses, dependency-tree, secrets]
+    needs: [changes, lint, typecheck, test, isolation, lowest-direct, licenses, dependency-tree, docs, secrets]
     runs-on: ubuntu-latest
     steps:
       - name: All required jobs passed or were skipped by path filters
