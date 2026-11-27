@@ -56,6 +56,8 @@ not_in_nav: |
 nav:
   - Home: index.md
   - Roadmap: roadmap.md
+  - API reference:
+      - lodekit-common: api/lodekit-common.md
   - Architecture decisions:
       - Overview: decisions/index.md
       - ADR-000 Licence (Apache-2.0): decisions/0000-license-apache-2.0.md
@@ -67,6 +69,9 @@ nav:
       - Toolchain: development/toolchain.md
       - Continuous integration: development/ci.md
       - Releasing: development/releasing.md
+      - Security baseline: development/security.md
       - Documentation: development/docs.md
+  - Examples:
+      - Synthetic retail dataset (EX-1): examples/synthetic-retail-dataset.md
   - Spikes:
       - Namespace packages and mypy: spikes/0001-namespace-packages-mypy.md

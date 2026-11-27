@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Correlation context of one run of a lodekit component.",
+  "properties": {
+    "component": {
+      "description": "Name of the component executing the run, e.g. `lodekit-flow`.",
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_.-]*$",
+      "title": "Component",
+      "type": "string"
+    },
+    "parent_run_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Identifier of the run that started this run, if any.",
+      "title": "Parent Run Id"
+    },
+    "run_id": {
+      "description": "Unique identifier of this run.",
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "started_at": {
+      "description": "Timezone-aware start time of the run.",
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "description": "Free-form labels; duplicates are removed, order is kept.",
+      "items": {
+        "maxLength": 128,
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run_id",
+    "parent_run_id",
+    "component",
+    "started_at",
+    "tags"
+  ],
+  "title": "RunContext",
+  "type": "object"
+}

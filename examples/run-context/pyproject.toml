@@ -1,0 +1,14 @@
+[project]
+name = "example-run-context"
+version = "0"
+description = "Example: correlate nested runs with lodekit.common.RunContext."
+requires-python = ">=3.11"
+dependencies = ["lodekit-common>=0.1,<0.2"]
+
+[tool.uv.sources]
+lodekit-common = { workspace = true }
+
+[tool.lodekit.example]
+run = ["python", "main.py"]
+expect = ["pipeline run_id=", "quality parent_run_id matches: True", "tags=('nightly', 'eu')"]
+timeout = 120
