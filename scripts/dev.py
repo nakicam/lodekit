@@ -6,6 +6,7 @@ Usage (from the repository root)::
     uv run python scripts/dev.py typecheck [MEMBER ...] [--no-root]
     uv run python scripts/dev.py test [MEMBER ...] [--no-root] [-- PYTEST_ARGS ...]
     uv run python scripts/dev.py check-license-files
+    uv run python scripts/dev.py affected [--base REF | --all] [--kind packages|examples]
 
 MEMBER is a workspace member name such as ``lodekit-common``. Without members, all are used.
 """
@@ -24,6 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 MEMBER_GLOBS = ("packages/*", "examples/*")
 LICENSE_FILES = ("LICENSE", "NOTICE")
 PYTEST_NO_TESTS_COLLECTED = 5
+GLOBAL_FILES = frozenset({"pyproject.toml", "uv.lock", ".python-version", "LICENSE", "NOTICE"})
+GLOBAL_PREFIXES = (".github/workflows/", ".github/actions/", "scripts/")
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,23 @@ def check_license_files(root: Path = ROOT) -> list[str]:
     return problems
 
 
+def affected(members: list[Member], changed_files: list[str]) -> list[Member]:
+    """Return members touched by ``changed_files`` plus all members depending on them.
+
+    Changes to workspace-wide files (root config, lockfile, CI, tooling) affect every member.
+    """
+    changed = [f.replace("\\", "/").strip() for f in changed_files if f.strip()]
+    if any(f in GLOBAL_FILES or f.startswith(GLOBAL_PREFIXES) for f in changed):
+        return members
+    hit = {m.name for m in members if any(f.startswith(f"{m.path}/") for f in changed)}
+    grew = True
+    while grew:
+        dependents = {m.name for m in members if hit.intersection(m.workspace_deps)}
+        grew = not dependents <= hit
+        hit |= dependents
+    return [m for m in members if m.name in hit]
+
+
 def _run(cmd: list[str], cwd: Path) -> int:
     where = cwd.relative_to(ROOT).as_posix()
     print(f"+ ({where}) {' '.join(cmd[1:])}", flush=True)
@@ -146,6 +166,30 @@ def test(members: list[Member], extra: list[str], *, include_root: bool) -> int:
     return status
 
 
+def _affected_from_args(members: list[Member], args: argparse.Namespace) -> list[Member]:
+    if args.all or not args.base:
+        hit = members
+    else:
+        diff = subprocess.run(
+            ["git", "diff", "--name-only", f"{args.base}...HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        hit = affected(members, diff.stdout.splitlines())
+    if args.kind != "all":
+        hit = [m for m in hit if m.kind == args.kind and (m.kind != "packages" or m.publishable)]
+    return hit
+
+
+def _chosen_members(members: list[Member], args: argparse.Namespace) -> list[Member]:
+    if args.members_json is None:
+        return select(members, args.members)
+    names = json.loads(args.members_json)
+    return select(members, names) if names else []
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point."""
     parser = argparse.ArgumentParser(
@@ -158,7 +202,17 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, help=f"run {name} per member")
         p.add_argument("members", nargs="*")
         p.add_argument("--no-root", action="store_true", help="skip repository-level checks")
+        p.add_argument(
+            "--members-json",
+            help="exact JSON list of members (as printed by 'affected'); '[]' selects none",
+        )
     sub.add_parser("check-license-files", help="verify per-package LICENSE/NOTICE copies")
+    p_aff = sub.add_parser("affected", help="print members affected by changed files as JSON")
+    p_aff.add_argument("--base", help="git ref to diff against (merge base with HEAD)")
+    p_aff.add_argument("--all", action="store_true", help="treat every member as affected")
+    p_aff.add_argument(
+        "--kind", choices=("all", "packages", "examples"), default="all", help="filter by kind"
+    )
 
     argv = sys.argv[1:] if argv is None else argv
     extra: list[str] = []
@@ -175,10 +229,14 @@ def main(argv: list[str] | None = None) -> int:
             for m in members:
                 print(f"{m.name:30} {m.path}")
         return 0
-    if args.command == "typecheck":
-        return typecheck(select(members, args.members), include_root=not args.no_root)
-    if args.command == "test":
-        return test(select(members, args.members), extra, include_root=not args.no_root)
+    if args.command in ("typecheck", "test"):
+        chosen = _chosen_members(members, args)
+        if args.command == "typecheck":
+            return typecheck(chosen, include_root=not args.no_root)
+        return test(chosen, extra, include_root=not args.no_root)
+    if args.command == "affected":
+        print(json.dumps([m.name for m in _affected_from_args(members, args)]))
+        return 0
     problems = check_license_files()
     for problem in problems:
         print(problem, file=sys.stderr)

@@ -1,0 +1,287 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.13.10"
+  PYTHONUTF8: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  changes:
+    name: Detect affected members
+    runs-on: ubuntu-latest
+    outputs:
+      members: ${{ steps.affected.outputs.members }}
+      packages: ${{ steps.affected.outputs.packages }}
+      all-packages: ${{ steps.affected.outputs.all-packages }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+      - id: affected
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then scope="--base $BASE_SHA"; else scope="--all"; fi
+          members=$(uv run --no-project python scripts/dev.py affected $scope)
+          packages=$(uv run --no-project python scripts/dev.py affected $scope --kind packages)
+          all_packages=$(uv run --no-project python scripts/dev.py affected --all --kind packages)
+          echo "members=$members" >> "$GITHUB_OUTPUT"
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "all-packages=$all_packages" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Affected workspace members"
+            echo "- members: \`$members\`"
+            echo "- publishable packages: \`$packages\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  lint:
+    name: Lint (ruff, lockfile, licence files)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv lock --check
+      - run: uv sync --all-packages --locked
+      - run: uv run --no-sync ruff check --output-format=github .
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync python scripts/dev.py check-license-files
+      - name: Namespace guard (package configuration)
+        run: uv run --no-sync python scripts/check_namespace.py
+      - name: actionlint (GitHub workflow linter)
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  typecheck:
+    name: Typecheck (mypy --strict)
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          python-version: "3.11"
+      - run: uv sync --all-packages --locked
+      - name: mypy per affected member and repository tooling
+        env:
+          MEMBERS: ${{ needs.changes.outputs.members }}
+        run: uv run --no-sync python scripts/dev.py typecheck --members-json "$MEMBERS"
+
+  ty:
+    name: Typecheck (ty, informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - run: uvx ty check --python .venv || echo "::warning::ty reported issues (informational only)"
+
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python }})
+    needs: changes
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python: "3.12"
+          - os: macos-latest
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          python-version: ${{ matrix.python }}
+      - run: uv sync --all-packages --locked
+      - name: pytest per affected member and repository tests (never live)
+        shell: bash
+        env:
+          MEMBERS: ${{ needs.changes.outputs.members }}
+        run: uv run --no-sync python scripts/dev.py test --members-json "$MEMBERS"
+
+  isolation:
+    name: Isolation (${{ matrix.package }})
+    needs: changes
+    if: needs.changes.outputs.packages != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+      - name: Build the package and wheels of its potential workspace dependencies
+        env:
+          ALL_PACKAGES: ${{ needs.changes.outputs.all-packages }}
+        run: |
+          uv build --package "${{ matrix.package }}" --out-dir dist
+          for pkg in $(echo "$ALL_PACKAGES" | python3 -c "import json,sys; print(' '.join(json.load(sys.stdin)))"); do
+            [ "$pkg" = "${{ matrix.package }}" ] || uv build --package "$pkg" --wheel --out-dir deps
+          done
+      - name: Namespace guard (built wheels contain no lodekit/__init__.py)
+        run: python3 scripts/check_namespace.py --wheels dist deps
+      - name: Install the wheel alone into a clean venv (no workspace, no editable installs)
+        run: |
+          uv venv "$RUNNER_TEMP/iso" --python 3.12
+          wheel=$(ls dist/*.whl)
+          uv pip install --python "$RUNNER_TEMP/iso" "$wheel" --find-links deps pytest pytest-asyncio
+          uv pip list --python "$RUNNER_TEMP/iso"
+      - name: Import from site-packages and run unit + contract tests against the wheel
+        working-directory: ${{ runner.temp }}
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          module=$(echo "${PKG#lodekit-}" | tr '-' '_')
+          "$RUNNER_TEMP/iso/bin/python" - <<EOF
+          import importlib, pathlib
+          mod = importlib.import_module("lodekit.$module")
+          assert "site-packages" in pathlib.Path(mod.__file__).parts, mod.__file__
+          import lodekit
+          assert getattr(lodekit, "__file__", None) is None, "lodekit must be a namespace package"
+          print("imported", mod.__name__, "from", mod.__file__)
+          EOF
+          tests="$GITHUB_WORKSPACE/packages/$PKG/tests"
+          if [ -d "$tests" ]; then
+            "$RUNNER_TEMP/iso/bin/python" -m pytest "$tests" -c "$GITHUB_WORKSPACE/pyproject.toml" \
+              --rootdir "$GITHUB_WORKSPACE" -m "unit or contract" -p no:cacheprovider
+          fi
+
+  lowest-direct:
+    name: Lowest direct dependencies (py3.11)
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          python-version: "3.11"
+      - run: uv sync --all-packages --resolution lowest-direct
+      - run: uv run --no-sync python scripts/dev.py test
+
+  licenses:
+    name: Licence policy (ADR-000)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Install runtime dependencies of all packages only (no dev tools)
+        run: uv sync --all-packages --no-dev --locked
+      - run: uv run --no-sync python scripts/check_licenses.py --markdown "$GITHUB_STEP_SUMMARY"
+
+  dependency-tree:
+    name: Dependency tree report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+      - name: Report runtime dependency tree and watched transitive dependencies
+        run: |
+          uv tree --no-dev --locked > dependency-tree.txt
+          uv export --all-packages --no-dev --no-hashes --no-emit-workspace --locked \
+            | grep -E '^[A-Za-z0-9]' > runtime-requirements.txt || true
+          {
+            echo "## Runtime dependency tree"
+            echo
+            echo "Third-party runtime distributions: **$(wc -l < runtime-requirements.txt)**"
+            echo
+            echo "| Watched transitive dependency | Present |"
+            echo "|---|---|"
+            for watched in langsmith langgraph-sdk; do
+              if grep -qiE "^${watched}==" runtime-requirements.txt; then present=yes; else present=no; fi
+              echo "| \`$watched\` | $present |"
+            done
+            echo
+            echo '<details><summary>uv tree --no-dev</summary>'
+            echo
+            echo '```text'
+            cat dependency-tree.txt
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dependency-tree
+          path: |
+            dependency-tree.txt
+            runtime-requirements.txt
+
+  docs:
+    name: Docs (mkdocs build --strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --all-packages --group docs --locked
+      - run: uv run --no-sync mkdocs build --strict
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [changes, lint, typecheck, test, isolation, lowest-direct, licenses, dependency-tree, docs, secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs passed or were skipped by path filters
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          python3 -c "import json,os; [print(f'{k}: {v[\"result\"]}') for k,v in json.loads(os.environ['NEEDS']).items()]"
+          test "$FAILED" = "false"
